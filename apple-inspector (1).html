@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Apple Inspector</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef0e6;--panel:#fbfbf5;--ink:#22301f;--mut:#5d6b57;--line:#c9d0bd;--g:#2e8b3d;--r:#d6362b;--a:#d9961a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141a12;--panel:#1e281b;--ink:#eaf1e4;--mut:#9aab92;--line:#37462f;--g:#56c466;--r:#ff6b5b;--a:#f2b441}}
+:root[data-theme="dark"]{--bg:#141a12;--panel:#1e281b;--ink:#eaf1e4;--mut:#9aab92;--line:#37462f;--g:#56c466;--r:#ff6b5b;--a:#f2b441}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:500 16px/1.4 "Pixelify Sans",ui-monospace,Menlo,monospace}
+.app{max-width:760px;margin:0 auto;padding:14px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+h1{font-size:28px;margin:0;font-weight:700}
+.btn,nav button{font:inherit;font-weight:700;border:3px solid var(--ink);background:var(--panel);color:var(--ink);padding:6px 12px;border-radius:0;cursor:pointer;box-shadow:3px 3px 0 var(--ink)}
+nav{display:flex;gap:8px;flex-wrap:wrap}
+nav button.on{background:var(--ink);color:var(--bg)}
+.btn.go{background:var(--g);color:#06200b;border-color:var(--ink)}
+.hud{display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;font-weight:700}
+.tbar{height:12px;border:3px solid var(--ink);background:var(--panel)}
+.tbar i{display:block;height:100%;width:100%;background:var(--g)}
+.client{margin:10px 0;border:3px solid var(--ink);background:var(--panel);padding:10px 12px;min-height:84px}
+.client p{margin:0 0 4px;color:var(--mut)}
+.client p:last-child{color:var(--ink);font-weight:700}
+svg.scene{width:100%;display:block;border:3px solid var(--ink);image-rendering:pixelated}
+.apple{cursor:pointer}
+.apple:focus{outline:none}
+.apple:focus-visible .hit{stroke:#fff;stroke-width:2;stroke-dasharray:3}
+.apple.wrong{animation:wob .4s}
+.apple.wrong .body{filter:grayscale(1) brightness(.6)}
+.apple.right{animation:pop .5s}
+@keyframes wob{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes pop{50%{transform:scale(1.5)}}
+.hit{fill:transparent}
+#msg{margin-top:10px;font-size:20px;font-weight:700;min-height:28px}
+#msg.bad{color:var(--r)}#msg.good{color:var(--g)}
+.ov{position:fixed;inset:0;background:rgba(8,12,8,.8);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+.ov[hidden]{display:none}
+.card{background:var(--panel);max-width:520px;padding:22px;border:4px solid var(--ink)}
+.card h2{font-size:26px;margin:0 0 10px;line-height:1.1}
+.card .row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<div class="app">
+<header><h1>The Apple Inspector</h1>
+<nav id="nav"><button data-r="1">Round 1: Clear rules</button><button data-r="2">Round 2: Client rules</button><button id="snd">Sound on</button></nav></header>
+<div class="hud"><span id="t">Time: 20s</span><span id="e">Wrong picks: 0</span></div>
+<div class="tbar"><i id="bar"></i></div>
+<div class="client" id="cl" aria-live="polite"></div>
+<svg class="scene" id="sc" viewBox="0 0 320 190" shape-rendering="crispEdges" role="group" aria-label="Two apple trees"></svg>
+<div id="msg" role="status"></div>
+</div>
+<div class="ov" id="ov" hidden><div class="card" id="card"></div></div>
+<script>
+const $=s=>document.querySelector(s),R=a=>a[Math.random()*a.length|0];
+let A=[],LAST=0;
+const shuf=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
+const cand=()=>A.filter(a=>a.c==='red'&&a.row>1);
+const SLOTS=[[24,[-14,14]],[46,[-42,-14,14,42]],[68,[-45,-15,15,45]]],ROWN=['top row','middle row','bottom row'],ORD=['1st','2nd','3rd','4th'];
+function deal(){do{A=[];let id=0;[1,2].forEach(t=>SLOTS.forEach(([y,xs],r)=>xs.forEach((dx,k)=>A.push({id:++id,t,row:r+1,col:k+1,x:(t===1?80:240)+dx,y,c:R(['red','red','green','yellow'])}))))}while(cand().length<3||cand().length>8)}
+const COL={red:'#d6362b',green:'#8fd14f',yellow:'#f2c230'};
+const MAP=["...s...",".aaaaa.","ahaaaaa","aaaaaaa","aaaaaaa",".aaaaa.","..a.a.."];
+const xy=a=>[a.x,a.y];
+const LIM={1:30000,2:40000};
+let G={},T,snd=true,ac;
+const say=(t,c='')=>{const m=$('#msg');m.textContent=t;m.className=c};
+const show=h=>{$('#card').innerHTML=h;$('#ov').hidden=false};
+function tone(seq,type,len){if(!snd)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();seq.forEach((f,i)=>{const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*len;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.08,t);g.gain.exponentialRampToValueAtTime(.001,t+len);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+len)})}catch(e){}}
+function tree(cx){let s='';[[24,12],[40,24],[56,36],[68,48],[72,60],[64,72],[48,84]].forEach(([w,y])=>s+=`<rect x="${cx-w}" y="${y-4}" width="${w*2}" height="14" fill="${y%24?'#2f7d3a':'#276b31'}"/>`);
+ return s+`<rect x="${cx-7}" y="90" width="14" height="66" fill="#6b4423"/><rect x="${cx-7}" y="90" width="4" height="66" fill="#85582d"/>`}
+function apple(a){const[x,y]=xy(a),u=3,x0=x-10,y0=y-10;let r='';
+ MAP.forEach((row,j)=>[...row].forEach((ch,i)=>{if(ch!=='.')r+=`<rect x="${x0+i*u}" y="${y0+j*u}" width="${u}" height="${u}" fill="${ch==='s'?'#5a3a1a':ch==='h'?'#fff3':COL[a.c]}"/>`}));
+ return `<g class="apple" data-id="${a.id}" tabindex="0" role="button" aria-label="Apple ${a.id}"><rect class="hit" x="${x-11}" y="${y-11}" width="22" height="22"/><g class="body">${r}</g><text x="${x}" y="${y+3}" text-anchor="middle" font-size="8" font-weight="700" fill="#fff" stroke="#1b2a18" stroke-width="2" paint-order="stroke" style="font-family:inherit">${a.id}</text></g>`}
+function scene(){$('#sc').innerHTML=`<rect width="320" height="190" fill="#8ec9f0"/><rect y="156" width="320" height="34" fill="#5cae45"/><rect y="156" width="320" height="4" fill="#3f8a32"/>`+tree(80)+tree(240)+A.map(apple).join('')}
+const bubble=t=>{const c=$('#cl');c.insertAdjacentHTML('beforeend',`<p>${t}</p>`)};
+function start(r){clearInterval(T);$('#ov').hidden=true;
+ deal();const pool=(r===1?A:cand()).map(a=>a.id).filter(i=>i!==LAST);G={r,correct:R(pool),errs:0,t:0,over:false,hints:0};LAST=G.correct;
+ document.querySelectorAll('#nav [data-r]').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));
+ $('#cl').innerHTML='<p>Client is waiting...</p>';say('');upd();scene();
+ show(r===1?`<h2>Round 1: Clear rules</h2><p>The client gives exact coordinates. Click the apple they describe before the ${LIM[1]/1000}s timer runs out.</p><div class="row"><button class="btn go" id="begin">Start round</button></div>`
+ :`<h2>Round 2: The client rules problem</h2><p>The client explains what they want, in their own words. Find the correct apple in ${LIM[2]/1000}s. A wrong pick is an error in the system.</p><div class="row"><button class="btn go" id="begin">Start round</button></div>`)}
+function begin(){$('#ov').hidden=true;$('#cl').innerHTML='';
+ if(G.r===1){const a=A[G.correct-1];bubble(`Client: "Pick the apple on Tree ${a.t}, ${ROWN[a.row-1]}, ${ORD[a.col-1]} from the left."`);G.hints=9}
+ T=setInterval(tick,100)}
+const H2=[[0,'Client: "I want the apple on the left tree..."'],[4000,'Client: "...wait, no, the one that is red but NOT on a high branch!"'],[9000,'Client: "Pick the apple on Tree 2 unless Tree 1 has an even ID number, but only if tested first!"']];
+function tick(){G.t+=100;const L=LIM[G.r];
+ if(G.r===2)while(G.hints<3&&G.t>=H2[G.hints][0])bubble(H2[G.hints++][1]);
+ upd();if(G.t>=L)end(false)}
+function upd(){const L=LIM[G.r||1];$('#t').textContent='Time: '+Math.max(0,Math.ceil((L-G.t)/1000))+'s';$('#e').textContent='Wrong picks: '+G.errs;$('#bar').style.width=Math.max(0,100-G.t/L*100)+'%'}
+function pick(id){if(G.over||!G.t&&!T)return;const g=document.querySelector(`.apple[data-id="${id}"]`);
+ if(id===G.correct){G.over=true;g.classList.add('right');tone([523,659,784,1047],'triangle',.15);say('CORRECT APPLE FOUND!','good');end(true)}
+ else{G.errs++;g.classList.remove('wrong');void g.getBBox();g.classList.add('wrong');tone([110,90],'sawtooth',.2);say('WRONG APPLE! ERR!','bad');upd()}}
+function end(win){clearInterval(T);G.over=true;const s=(G.t/1000).toFixed(1);
+ setTimeout(()=>show(G.r===1?
+ `<h2>${win?`Found in ${s}s`:"Time's up"}</h2><p>${G.errs} wrong picks. With exact coordinates, everyone knows what "done" looks like. CorrectAppleID was ${G.correct}.</p><div class="row"><button class="btn" data-r="1">Replay</button><button class="btn go" data-r="2">Next: Client rules</button></div>`
+ :`<h2>${win?`Found it, after ${G.errs} wrong picks`:"Time's up: client escalated"}</h2><p>CorrectAppleID was ${G.correct}. The hints fit ${cand().length} apples (${cand().map(a=>a.id).join(', ')}), so every wrong pick was a guess, not a mistake. Vague specs turn careful people into blind clickers.</p><p><b>Discuss:</b> How many wrong apples has your team picked from a spec like this?</p><div class="row"><button class="btn" data-r="2">Replay</button><button class="btn" data-r="1">Back to Round 1</button></div>`),win?900:100)}
+$('#sc').onclick=e=>{const g=e.target.closest('.apple');if(g)pick(+g.dataset.id)};
+$('#sc').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){const g=e.target.closest('.apple');if(g){e.preventDefault();pick(+g.dataset.id)}}};
+$('#card').onclick=e=>{if(e.target.id==='begin')begin();const r=e.target.dataset.r;if(r)start(+r)};
+$('#nav').onclick=e=>{const r=e.target.dataset.r;if(r)start(+r);if(e.target.id==='snd'){snd=!snd;e.target.textContent=snd?'Sound on':'Sound off'}};
+start(1);
+</script></body></html>
